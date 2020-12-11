@@ -1223,11 +1223,15 @@ fn completionHandler(arena: *std.heap.ArenaAllocator, id: types.RequestId, req: 
         const doc_position = try offsets.documentPosition(handle.document, req.params.position, offset_encoding);
         const pos_context = try analysis.documentPositionContext(arena, handle.document, doc_position);
 
-        const use_snippets = config.enable_snippets and client_capabilities.supports_snippets;
+        const after = std.mem.trimLeft(u8, doc_position.line[doc_position.line_index..], " ");
+        var config_copy = config;
+        if (after.len > 0 and after[0] == '(') {
+            config_copy.enable_snippets = false;
+        }
         switch (pos_context) {
             .builtin => try completeBuiltin(arena, id, config),
-            .var_access, .empty => try completeGlobal(arena, id, doc_position.absolute_index, handle, config),
-            .field_access => |range| try completeFieldAccess(arena, id, handle, doc_position, range, config),
+            .var_access, .empty => try completeGlobal(arena, id, doc_position.absolute_index, handle, config_copy),
+            .field_access => |range| try completeFieldAccess(arena, id, handle, doc_position, range, config_copy),
             .global_error_set => try send(arena, types.Response{
                 .id = id,
                 .result = .{
